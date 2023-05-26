@@ -181,9 +181,9 @@ if __name__ == "__main__":
     Path(f"./results/{project_name}").mkdir(parents=True, exist_ok=True)
     device = "cuda:6"
 
-    # model_id_or_path = "runwayml/stable-diffusion-v1-5"
-    model_id_or_path = "CompVis/stable-diffusion-v1-4"
-    scheduler = DDIMScheduler.from_config(model_id_or_path, subfolder="scheduler")
+    model_id_or_path = "runwayml/stable-diffusion-v1-5"
+    # model_id_or_path = "CompVis/stable-diffusion-v1-4"
+    scheduler = DDIMScheduler.from_pretrained(model_id_or_path, subfolder="scheduler")
     SD_pipe = StableDiffusionPipeline.from_pretrained(model_id_or_path, scheduler=scheduler, torch_dtype=torch.float32, safety_checker=None, feature_extractor=None, requires_safety_checker=False).to(device)
     SD_pipe.enable_attention_slicing()
     SD_pipe.enable_xformers_memory_efficient_attention()
@@ -199,6 +199,7 @@ if __name__ == "__main__":
 
     generator = torch.Generator(device=device)
     if run_ddim:
+        print("[Stage 0] Running DDIM Inversion for Initial Trajectory Generation...")
         init_trajectory = ddim_inversion(SD_pipe, source_prompt, og_image, T, generator, torch_dtype=torch.float32)
         print(init_trajectory.shape)
         torch.save(init_trajectory, f"./results/{project_name}/init_trajectory.pt")
@@ -217,6 +218,7 @@ if __name__ == "__main__":
             im[0][0].save(f"./results/{project_name}/DDIM_reconstruction.png")
 
     if run_null:
+        print("[Stage 1] Running Null-Text-Inversion...")
         init_trajectory = torch.load(f"./results/{project_name}/init_trajectory.pt")
         generator = torch.Generator(device=device)
         z_T, null_embeddings = null_text_inversion(SD_pipe, init_trajectory, source_prompt,
@@ -226,6 +228,7 @@ if __name__ == "__main__":
 
 
     if run_gen:
+        print("[Stage 2] Reconstructing + Editing Image via refined Inversion...")
         init_trajectory = torch.load(f"./results/{project_name}/init_trajectory.pt")
         null_embeddings = torch.load(f"./results/{project_name}/nulls.pt")
 
